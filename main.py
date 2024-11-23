@@ -221,7 +221,7 @@ async def get_current_track():
         
         await session.close()
 
-        if track is None:
+        if track['playable_id'] is None:
             raise Exception('No current track.')
         
         return {
@@ -361,7 +361,7 @@ class Presence:
                         if button_config != ButtonConfig.NEITHER:
                             presence_args['buttons'] = build_buttons(ongoing_track['link'])
 
-                        presence_args['small_image'] = "https://github.com/FozerG/WinYandexMusicRPC/blob/main/assets/Playing.png?raw=true"
+                        presence_args['small_image'] = "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Playing.png?raw=true"
                         presence_args['small_text'] = "Playing" if language_config == LanguageConfig.ENGLISH else "Проигрывается"
                         Presence.rpc.update(**presence_args)
                     else:
@@ -381,7 +381,7 @@ class Presence:
                                 'state': ongoing_track['artist'],
                                 'large_image': ongoing_track['og-image'],
                                 'large_text': ongoing_track['album'],
-                                'small_image': "https://github.com/FozerG/WinYandexMusicRPC/blob/main/assets/Paused.png?raw=true",
+                                'small_image': "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Paused.png?raw=true",
                                 'small_text': "On pause" if language_config == LanguageConfig.ENGLISH else "На паузе"
                             }
                             if button_config != ButtonConfig.NEITHER:
