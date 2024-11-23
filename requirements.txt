@@ -1,0 +1,21 @@
+pypresence @ git+https://github.com/qwertyquerty/pypresence.git
+winrt-Windows.Foundation.Collections
+winrt-Windows.Storage.Streams
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+winrt-Windows.Media
+winrt-runtime
+winrt-sdk
+pyinstaller==6.5.0
+PyQtWebEngine
+yandex-music
+packaging
+requests
+colorama
+pystray
+keyring
+pywin32
+Pillow
+asyncio
+psutil
+PyQt5
