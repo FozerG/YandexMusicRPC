@@ -5,8 +5,8 @@ from yandex_music import Client, exceptions
 from colorama import init, Fore, Style
 from win32com.client import Dispatch  # Импортируем Dispatch для создания COM объекта
 
-from http.client import HTTPException
 import aiohttp
+from aiohttp import ClientConnectorError, ClientTimeout
 import random
 import string
 
@@ -39,7 +39,7 @@ CLIENT_ID_EN = '1269807014393942046' #Yandex Music
 CLIENT_ID_RU_DECLINED = '1269826362399522849' #Яндекс Музыку (склонение для активности "Слушает")
 
 # Версия (tag) скрипта для проверки на актуальность через Github Releases
-CURRENT_VERSION = "v0.1"
+CURRENT_VERSION = "v0.2"
 
 # Ссылка на репозиторий
 REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
@@ -92,6 +92,19 @@ class PlaybackStatus(Enum):
     Paused = 0
     Playing = 1
 
+
+def extract_device_name(data):
+    try:
+        devices = data.get("devices", [])
+        active_device_id = data.get("active_device_id_optional")
+        
+        for device in devices:
+            if device["info"]["device_id"] == active_device_id:
+                return device["info"]["title"]
+        return "Unknown"
+    except KeyError as e:
+        return f"error: {e}"
+
 async def get_info():
     global ya_token
     class Info:
@@ -101,11 +114,10 @@ async def get_info():
             try:
                 track = Presence.client.tracks([track_id])
                 if not track or not track[0]:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Track with ID {track_id} not found."
-                    )
+                    log(f"Track with ID {track_id} not found.", LogType.Error)
+                    return {'success': False}
                 return {
+                    "success": True,
                     "track_id": track[0].track_id,
                     "title": track[0].title,
                     "og-image": track[0].og_image,
@@ -113,10 +125,8 @@ async def get_info():
                     "album": track[0].albums[0].title if track[0].albums else None,
                 }
             except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to fetch track info for ID {track_id}: {str(e)}"
-                ) from e
+                log(f"Failed to fetch track info for ID {track_id}: {str(e)}", LogType.Error)
+                return {'success': False}
 
     return Info(ya_token)
     
@@ -132,107 +142,131 @@ async def get_current_track():
         "Ynison-Device-Info": json.dumps(device_info)
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.ws_connect(
-            url="wss://ynison.music.yandex.ru/redirector.YnisonRedirectService/GetRedirectToYnison",
-            headers={
-                "Sec-WebSocket-Protocol": f"Bearer, v2, {json.dumps(ws_proto)}",
-                "Origin": "http://music.yandex.ru",
-                "Authorization": f"OAuth {ya_token}",
-            },
-        ) as ws:
-            recv = await ws.receive()
-            data = json.loads(recv.data)
+    timeout = ClientTimeout(
+    total=15,
+    connect=10 
+    )
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.ws_connect(
+                url="wss://ynison.music.yandex.ru/redirector.YnisonRedirectService/GetRedirectToYnison",
+                headers={
+                    "Sec-WebSocket-Protocol": f"Bearer, v2, {json.dumps(ws_proto)}",
+                    "Origin": "http://music.yandex.ru",
+                    "Authorization": f"OAuth {ya_token}",
+                },timeout=10
+            ) as ws:
+                recv = await ws.receive()
+                data = json.loads(recv.data)
 
-        new_ws_proto = ws_proto.copy()
-        new_ws_proto["Ynison-Redirect-Ticket"] = data["redirect_ticket"]
+            if "redirect_ticket" not in data or "host" not in data:
+                log(f"Invalid response structure: {data}", LogType.Error)
+                return {'success': False}
+            
+            new_ws_proto = ws_proto.copy()
+            new_ws_proto["Ynison-Redirect-Ticket"] = data["redirect_ticket"]
 
-        to_send = {
-            "update_full_state": {
-                "player_state": {
-                    "player_queue": {
-                        "current_playable_index": -1,
-                        "entity_id": "",
-                        "entity_type": "VARIOUS",
-                        "playable_list": [],
-                        "options": {
-                            "repeat_mode": "NONE"
+            to_send = {
+                "update_full_state": {
+                    "player_state": {
+                        "player_queue": {
+                            "current_playable_index": -1,
+                            "entity_id": "",
+                            "entity_type": "VARIOUS",
+                            "playable_list": [],
+                            "options": {
+                                "repeat_mode": "NONE"
+                            },
+                            "entity_context": "BASED_ON_ENTITY_BY_DEFAULT",
+                            "version": {
+                                "device_id": ws_proto["Ynison-Device-Id"],
+                                "version": 9021243204784341000,
+                                "timestamp_ms": 0
+                            },
+                            "from_optional": ""
                         },
-                        "entity_context": "BASED_ON_ENTITY_BY_DEFAULT",
-                        "version": {
-                            "device_id": ws_proto["Ynison-Device-Id"],
-                            "version": 9021243204784341000,
-                            "timestamp_ms": 0
-                        },
-                        "from_optional": ""
-                    },
-                    "status": {
-                        "duration_ms": 0,
-                        "paused": True,
-                        "playback_speed": 1,
-                        "progress_ms": 0,
-                        "version": {
-                            "device_id": ws_proto["Ynison-Device-Id"],
-                            "version": 8321822175199937000,
-                            "timestamp_ms": 0
+                        "status": {
+                            "duration_ms": 0,
+                            "paused": True,
+                            "playback_speed": 1,
+                            "progress_ms": 0,
+                            "version": {
+                                "device_id": ws_proto["Ynison-Device-Id"],
+                                "version": 8321822175199937000,
+                                "timestamp_ms": 0
+                            }
                         }
-                    }
+                    },
+                    "device": {
+                        "capabilities": {
+                            "can_be_player": True,
+                            "can_be_remote_controller": False,
+                            "volume_granularity": 16
+                        },
+                        "info": {
+                            "device_id": ws_proto["Ynison-Device-Id"],
+                            "type": "WEB",
+                            "title": "Chrome Browser",
+                            "app_name": "Chrome"
+                        },
+                        "volume_info": {
+                            "volume": 0
+                        },
+                        "is_shadow": True
+                    },
+                    "is_currently_active": False
                 },
-                "device": {
-                    "capabilities": {
-                        "can_be_player": True,
-                        "can_be_remote_controller": False,
-                        "volume_granularity": 16
-                    },
-                    "info": {
-                        "device_id": ws_proto["Ynison-Device-Id"],
-                        "type": "WEB",
-                        "title": "Chrome Browser",
-                        "app_name": "Chrome"
-                    },
-                    "volume_info": {
-                        "volume": 0
-                    },
-                    "is_shadow": True
-                },
-                "is_currently_active": False
-            },
-            "rid": "ac281c26-a047-4419-ad00-e4fbfda1cba3",
-            "player_action_timestamp_ms": 0,
-            "activity_interception_type": "DO_NOT_INTERCEPT_BY_DEFAULT"
-        }
+                "rid": "ac281c26-a047-4419-ad00-e4fbfda1cba3",
+                "player_action_timestamp_ms": 0,
+                "activity_interception_type": "DO_NOT_INTERCEPT_BY_DEFAULT"
+            }
 
-        async with session.ws_connect(
-            url=f"wss://{data['host']}/ynison_state.YnisonStateService/PutYnisonState",
-            headers={
-                "Sec-WebSocket-Protocol": f"Bearer, v2, {json.dumps(new_ws_proto)}",
-                "Origin": "http://music.yandex.ru",
-                "Authorization": f"OAuth {ya_token}",
-            },
-            method="GET"
-        ) as ws:
-            await ws.send_str(json.dumps(to_send))
-            recv = await ws.receive()
-            ynison = json.loads(recv.data)
-            track_index = ynison['player_state']['player_queue']['current_playable_index']
-            if track_index == -1:
-                return {"error": "No track is currently playing."}
-            track = ynison['player_state']['player_queue']['playable_list'][track_index]
+            async with session.ws_connect(
+                url=f"wss://{data['host']}/ynison_state.YnisonStateService/PutYnisonState",
+                headers={
+                    "Sec-WebSocket-Protocol": f"Bearer, v2, {json.dumps(new_ws_proto)}",
+                    "Origin": "http://music.yandex.ru",
+                    "Authorization": f"OAuth {ya_token}",
+                },timeout=10,
+                method="GET"
+            ) as ws:
+                await ws.send_str(json.dumps(to_send))
+                recv = await asyncio.wait_for(ws.receive(), timeout=10)
+                ynison = json.loads(recv.data)
+                track_index = ynison['player_state']['player_queue']['current_playable_index']
+                if track_index == -1:
+                    log(f"No track is currently playing.", LogType.Error)
+                    return {'success': False}
+                track = ynison['player_state']['player_queue']['playable_list'][track_index]
+            
+            await session.close()
+            track = await (await get_info()).get_track_by_id(track['playable_id'])
+            return {
+                "device_name": extract_device_name(ynison),
+                "paused": ynison['player_state']['status']['paused'],
+                "duration_ms": ynison['player_state']['status']['duration_ms'],
+                "progress_ms": ynison['player_state']['status']['progress_ms'],
+                "entity_id": ynison['player_state']['player_queue']['entity_id'],
+                "repeat_mode": ynison['player_state']['player_queue']['options']['repeat_mode'],
+                "entity_type": ynison['player_state']['player_queue']['entity_type'],
+                "track": track,
+                "success": True
+            }
         
-        await session.close()
+    except ClientConnectorError as e:
+        log(f"Cannot connect to host: {e}. Please check your connection.", LogType.Error)
+        return {'success': False}
 
-        if track['playable_id'] is None:
-            raise Exception('No current track.')
-        
-        return {
-            "paused": ynison['player_state']['status']['paused'],
-            "duration_ms": ynison['player_state']['status']['duration_ms'],
-            "progress_ms": ynison['player_state']['status']['progress_ms'],
-            "entity_id": ynison['player_state']['player_queue']['entity_id'],
-            "repeat_mode": ynison['player_state']['player_queue']['options']['repeat_mode'],
-            "entity_type": ynison['player_state']['player_queue']['entity_type'],
-            "track": await (await get_info()).get_track_by_id(track['playable_id'])
-        }
+    except asyncio.TimeoutError:
+        log("Request timed out. Please check your connection.", LogType.Error)
+        return {'success': False}
+
+    except Exception as e:
+        log(f"An unexpected error occurred: {str(e)}", LogType.Error)
+        return {'success': False}
+    finally:
+        if session:
+            await session.close()
     
 class Presence:
     client = None
@@ -418,16 +452,16 @@ class Presence:
     def getTrack() -> dict:
         try:
             current_state = asyncio.run(get_current_track())
-            track_info = current_state["track"]
-            if not current_state:
-                log("No media information returned from get_current_track", LogType.Error)
+            if not current_state['success'] or not current_state["track"]['success']:
+                log("Not successfully get all the information about the track.", LogType.Error)
                 return {'success': False}
+            track_info = current_state["track"]
             name_current = ", ".join(track_info['artists']) + " - " + track_info['title']
             global name_prev
             global strong_find
             if str(name_current) != name_prev:
-                log("Now listening to " + name_current)
-            else: #Если песня уже играет, просто вернем её с актуальным статусом паузы и позиции.
+                log(f'Now listening to "{name_current}" on device "{current_state["device_name"]}"')
+            elif Presence.currentTrack["success"]: #Если песня уже играет, просто вернем её с актуальным статусом паузы и позиции.
                 currentTrack_copy = Presence.currentTrack.copy()
                 currentTrack_copy["start-time"] = timedelta(milliseconds=int(current_state["progress_ms"]))
                 currentTrack_copy["playback"] = PlaybackStatus.Paused if current_state["paused"] else PlaybackStatus.Playing
@@ -442,7 +476,7 @@ class Presence:
                     'title': Single_char(TrimString(track_info["title"], 40)),
                     'artist': Single_char(TrimString(f"{', '.join(track_info['artists'])}",40)),
                     'album':    Single_char(TrimString(track_info["album"],25)),
-                    'label': TrimString(f"{', '.join(track_info['artists'])} - {track_info["title"]}",50),
+                    'label': TrimString(f"{', '.join(track_info['artists'])} - {track_info["title"]}",60),
                     'link': f"https://music.yandex.ru/album/{trackId[1]}/track/{trackId[0]}/",
                     'durationSec': duration_ms // 1000,
                     'formatted_duration': format_duration(duration_ms),
@@ -857,10 +891,7 @@ def Is_run_by_exe():
         return False
 
 def contains_non_latin_chars(s):
-    """
-    Проверяет, содержит ли строка символы, отличные от английских букв,
-    цифр и стандартных знаков пунктуации.
-    """
+    # Проверяет, содержит ли строка символы, отличные от английских букв, цифр и стандартных знаков пунктуации.
     allowed_chars = string.ascii_letters + string.digits + string.punctuation + " "
     return any(char not in allowed_chars for char in s)
 
