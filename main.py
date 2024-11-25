@@ -39,7 +39,7 @@ CLIENT_ID_EN = '1269807014393942046' #Yandex Music
 CLIENT_ID_RU_DECLINED = '1269826362399522849' #Яндекс Музыку (склонение для активности "Слушает")
 
 # Версия (tag) скрипта для проверки на актуальность через Github Releases
-CURRENT_VERSION = "v0.2"
+CURRENT_VERSION = "v0.2.1"
 
 # Ссылка на репозиторий
 REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
@@ -354,6 +354,7 @@ class Presence:
         Presence.discord_available()
         Presence.running = True
         Presence.currentTrack = None
+
         while Presence.running:
             if not Presence.client:
                 if not clientErrorShown:
@@ -361,92 +362,106 @@ class Presence:
                     clientErrorShown = True
                 time.sleep(3)
                 continue
+
             currentTime = time.time()
             if not Presence.is_discord_running():
-                Presence.discord_was_closed() 
+                Presence.discord_was_closed()
             if needRestart:
                 needRestart = False
                 Presence.restart()
+
             try:
                 ongoing_track = Presence.getTrack()
-                if Presence.currentTrack != ongoing_track: # проверяем что песня не играла до этого, т.к она просто может быть снята с паузы.
-                    if ongoing_track['success']: 
-                        if Presence.currentTrack is not None and 'label' in Presence.currentTrack and Presence.currentTrack['label'] is not None:
-                            if ongoing_track['label'] != Presence.currentTrack['label']: 
-                                log(f"Changed track to {ongoing_track['label']}", LogType.Update_Status)
-                        else:
-                            log(f"Changed track to {ongoing_track['label']}", LogType.Update_Status)
-                        Presence.paused_time = 0
-                        trackTime = currentTime
-                        start_time = currentTime - int(ongoing_track['start-time'].total_seconds())
-                        end_time = start_time + ongoing_track['durationSec']
-                        presence_args = {
-                            'activity_type': 2,
-                            'details': ongoing_track['title'],
-                            'state': ongoing_track['artist'],
-                            'start': start_time,
-                            'end': end_time,
-                            'large_image': ongoing_track['og-image'],
-                        }
+                if ongoing_track['success']:
+                    is_new_track = (
+                            Presence.currentTrack is None or
+                            Presence.currentTrack.get('label') != ongoing_track.get('label')
+                    )
+                    is_start_time_changed = (
+                        Presence.currentTrack and
+                        Presence.currentTrack.get('start-time') != ongoing_track.get('start-time')
+                    )
+                    is_paused = ongoing_track["playback"] != PlaybackStatus.Playing
+                    is_playing = not is_paused
 
-                        if ongoing_track['album'] != ongoing_track['title']:
-                            presence_args['large_text'] = ongoing_track['album']
-
-                        if button_config != ButtonConfig.NEITHER:
-                            presence_args['buttons'] = build_buttons(ongoing_track['link'])
-
-                        presence_args['small_image'] = "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Playing.png?raw=true"
-                        presence_args['small_text'] = "Playing" if language_config == LanguageConfig.ENGLISH else "Проигрывается"
-                        Presence.rpc.update(**presence_args)
-                    else:
-                        Presence.rpc.clear()
-                        log(f"Clear RPC")
-
-                    Presence.currentTrack = ongoing_track
-
-                else: #Песня не новая, проверяем статус паузы
-                    if ongoing_track['success'] and ongoing_track["playback"] != PlaybackStatus.Playing and not Presence.paused:
-                        Presence.paused = True
-                        log(f"Track {ongoing_track['label']} on pause", LogType.Update_Status)
-                        if ongoing_track['success']:
-                            presence_args = {
-                                'activity_type': 2,
-                                'details': ongoing_track['title'],
-                                'state': ongoing_track['artist'],
-                                'large_image': ongoing_track['og-image'],
-                                'large_text': ongoing_track['album'],
-                                'small_image': "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Paused.png?raw=true",
-                                'small_text': "On pause" if language_config == LanguageConfig.ENGLISH else "На паузе"
-                            }
-                            if button_config != ButtonConfig.NEITHER:
-                                presence_args['buttons'] = build_buttons(ongoing_track['link'])
-
-                            presence_args['large_text'] = f"{'On pause' if language_config == LanguageConfig.ENGLISH else 'На паузе'} {format_duration(int(ongoing_track['start-time'].total_seconds() * 1000))} / {ongoing_track['formatted_duration']}"
-
-                            if int(ongoing_track['start-time'].total_seconds()) != 0:
-                                presence_args['small_text'] = f"{'On pause' if language_config == LanguageConfig.ENGLISH else 'На паузе'} {format_duration(int(ongoing_track['start-time'].total_seconds() * 1000))} / {ongoing_track['formatted_duration']}"
-
-                            Presence.rpc.update(**presence_args)
-
-                    elif ongoing_track['success'] and ongoing_track["playback"] == PlaybackStatus.Playing and Presence.paused:
-                        log(f"Track {ongoing_track['label']} off pause.", LogType.Update_Status)
+                    if is_new_track:
+                        log(f"Changed track to {ongoing_track['label']}", LogType.Update_Status)
+                        Presence.update_presence(ongoing_track, currentTime)
+                        Presence.currentTrack = ongoing_track
                         Presence.paused = False
+                        Presence.paused_time = 0
 
-                    elif ongoing_track['success'] and ongoing_track["playback"] != PlaybackStatus.Playing and Presence.paused and trackTime != 0:
+                    elif is_start_time_changed and not Presence.paused:
+                        Presence.update_presence(ongoing_track, currentTime)
+                        Presence.currentTrack = ongoing_track
+                        Presence.paused = False
+                        Presence.paused_time = 0
+
+                    elif is_paused and not Presence.paused:
+                        log(f"Track {ongoing_track['label']} on pause", LogType.Update_Status)
+                        Presence.update_presence(ongoing_track, paused=True)
+                        Presence.paused = True
+                        trackTime = 0  # сброс времени трека
+
+                    elif is_playing and Presence.paused:
+                        log(f"Track {ongoing_track['label']} off pause.", LogType.Update_Status)
+                        Presence.update_presence(ongoing_track, currentTime)
+                        Presence.paused = False
+                        Presence.currentTrack = ongoing_track
+
+                    if Presence.paused and trackTime != 0:
                         Presence.paused_time = currentTime - trackTime
-                        if Presence.paused_time > 5 * 60:  # если пауза больше 5 минут
+                        if Presence.paused_time > 5 * 60:  # Если пауза больше 5 минут
                             trackTime = 0
                             Presence.rpc.clear()
                             log(f"Clear RPC due to paused for more than 5 minutes", LogType.Update_Status)
                     else:
-                        Presence.paused_time = 0  # если трек продолжает играть, сбрасываем paused_time
-
+                        Presence.paused_time = 0
+                else:
+                    Presence.rpc.clear()
+                    log(f"Clear RPC by error")
                 time.sleep(3)
             except pypresence.exceptions.PipeClosed:
-                Presence.discord_was_closed()        
+                Presence.discord_was_closed()
             except Exception as e:
                 log(f"Presence class stopped for a reason: {e}", LogType.Error)
 
+    @staticmethod
+    def update_presence(ongoing_track, current_time=0, paused=False):
+        start_time = current_time - int(ongoing_track['start-time'].total_seconds())
+        end_time = start_time + ongoing_track['durationSec']
+
+        if language_config == LanguageConfig.RUSSIAN:
+            playing_text = "Проигрывается"
+            paused_text = "На паузе"
+        else:
+            playing_text = "Playing"
+            paused_text = "On pause"
+
+        presence_args = {
+            'activity_type': 2,
+            'details': ongoing_track['title'],
+            'state': ongoing_track['artist'],
+            'large_image': ongoing_track['og-image'],
+            'small_image': "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Paused.png?raw=true" if paused else "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Playing.png?raw=true",
+            'small_text': paused_text if paused else playing_text
+        }
+
+        if ongoing_track['album'] != ongoing_track['title']:
+            presence_args['large_text'] = ongoing_track['album']
+
+        if paused:
+            presence_args['large_text'] = f"{paused_text} {format_duration(int(ongoing_track['start-time'].total_seconds() * 1000))} / {ongoing_track['formatted_duration']}"
+        else:
+            presence_args['start'] = start_time
+            presence_args['end'] = end_time
+
+        if button_config != ButtonConfig.NEITHER:
+            presence_args['buttons'] = build_buttons(ongoing_track['link'])
+
+        Presence.rpc.update(**presence_args)
+
+        
     # Метод для получения информации о текущем треке.
     @staticmethod
     def getTrack() -> dict:
