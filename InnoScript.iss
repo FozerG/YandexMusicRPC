@@ -35,6 +35,12 @@ english.AdditionalTasks=Additional tasks
 russian.RunDescription=Запустить YandexMusicRPC
 russian.CreateDesktop=Создать значок на рабочем столе
 russian.AdditionalTasks=Дополнительные задачи
+english.InstallationTitle=Installation of YandexMusicRPC
+english.UpdateTitle=Update of YandexMusicRPC
+english.UpdateMSG=Please ensure that the application is closed before starting the update to avoid potential errors.
+russian.InstallationTitle=Установка YandexMusicRPC
+russian.UpdateTitle=Обновление YandexMusicRPC
+russian.UpdateMSG=Пожалуйста, убедитесь что приложение закрыто перед началом обновления, чтобы избежать возможных ошибок.
 
 [Files]
 Source: "dist\YandexMusicRPC-cli\YandexMusicRPC.exe"; DestDir: "{pf}\YandexMusicRPC"; Flags: ignoreversion
@@ -45,6 +51,22 @@ Name: "{group}\YandexMusicRPC"; Filename: "{pf}\YandexMusicRPC\YandexMusicRPC.ex
 Name: "{autodesktop}\YandexMusicRPC"; Filename: "{pf}\YandexMusicRPC\YandexMusicRPC.exe"; Tasks: desktopicon
 
 [Code]
+function IsAppInstalled: Boolean;
+var
+  InstallPath: string;
+begin
+  Result := RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\YandexMusicRPC_is1', 'InstallLocation', InstallPath);
+end;
+
+procedure InitializeWizard;
+begin
+  if IsAppInstalled then
+    MsgBox('The same version of YandexMusicRPC is already installed. Update is not required.', mbInformation, MB_OK);
+    WizardForm.Caption := CustomMessage('UpdateTitle')
+  else
+    WizardForm.Caption := CustomMessage('InstallationTitle');
+end;
+
 procedure DeleteStartupShortcut;
 var
   StartupShortcut: string;

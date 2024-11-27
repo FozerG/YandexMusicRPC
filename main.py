@@ -448,11 +448,13 @@ class Presence:
         presence_args = {
             'activity_type': 2,
             'details': ongoing_track['title'],
-            'state': ongoing_track['artist'],
+            
             'large_image': ongoing_track['og-image'],
             'small_image': "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Paused.png?raw=true" if paused else "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Playing.png?raw=true",
             'small_text': paused_text if paused else playing_text
         }
+        if ongoing_track['artist']:
+            presence_args['state'] = ongoing_track['artist']
 
         if ongoing_track['album'] != ongoing_track['title']:
             presence_args['large_text'] = ongoing_track['album']
