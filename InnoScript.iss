@@ -1,4 +1,4 @@
-#define ScriptVersion "0.2.1"
+#define ScriptVersion "0.2.2"
 [Setup]
 AppName=YandexMusicRPC
 AppPublisher=FozerG
@@ -61,10 +61,14 @@ end;
 procedure InitializeWizard;
 begin
   if IsAppInstalled then
-    MsgBox('The same version of YandexMusicRPC is already installed. Update is not required.', mbInformation, MB_OK);
-    WizardForm.Caption := CustomMessage('UpdateTitle')
+  begin
+    WizardForm.Caption := CustomMessage('UpdateTitle');
+    MsgBox(CustomMessage('UpdateMSG'), mbInformation, MB_OK);
+  end
   else
+  begin
     WizardForm.Caption := CustomMessage('InstallationTitle');
+  end;
 end;
 
 procedure DeleteStartupShortcut;
