@@ -39,7 +39,7 @@ CLIENT_ID_EN = '1269807014393942046' #Yandex Music
 CLIENT_ID_RU_DECLINED = '1269826362399522849' #Яндекс Музыку (склонение для активности "Слушает")
 
 # Версия (tag) скрипта для проверки на актуальность через Github Releases
-CURRENT_VERSION = "v0.2.1"
+CURRENT_VERSION = "v0.2.2"
 
 # Ссылка на репозиторий
 REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
@@ -344,6 +344,14 @@ class Presence:
         global name_prev
         name_prev = None
         Presence.discord_available()    
+
+    @staticmethod
+    def FullClearRPC() -> None:
+        log("Clear RPC due to error", LogType.Error)
+        Presence.currentTrack = None
+        global name_prev
+        name_prev = None
+        Presence.rpc.clear()
             
     # Метод для запуска Rich Presence.
     @staticmethod
@@ -362,7 +370,7 @@ class Presence:
                     clientErrorShown = True
                 time.sleep(3)
                 continue
-
+            clientErrorShown = False
             currentTime = time.time()
             if not Presence.is_discord_running():
                 Presence.discord_was_closed()
@@ -383,7 +391,6 @@ class Presence:
                     )
                     is_paused = ongoing_track["playback"] != PlaybackStatus.Playing
                     is_playing = not is_paused
-
                     if is_new_track:
                         log(f"Changed track to {ongoing_track['label']}", LogType.Update_Status)
                         Presence.update_presence(ongoing_track, currentTime)
@@ -401,13 +408,14 @@ class Presence:
                         log(f"Track {ongoing_track['label']} on pause", LogType.Update_Status)
                         Presence.update_presence(ongoing_track, paused=True)
                         Presence.paused = True
-                        trackTime = 0  # сброс времени трека
+                        trackTime = currentTime
 
                     elif is_playing and Presence.paused:
                         log(f"Track {ongoing_track['label']} off pause.", LogType.Update_Status)
                         Presence.update_presence(ongoing_track, currentTime)
                         Presence.paused = False
                         Presence.currentTrack = ongoing_track
+                        trackTime = 0
 
                     if Presence.paused and trackTime != 0:
                         Presence.paused_time = currentTime - trackTime
@@ -418,8 +426,7 @@ class Presence:
                     else:
                         Presence.paused_time = 0
                 else:
-                    Presence.rpc.clear()
-                    log(f"Clear RPC by error")
+                    Presence.FullClearRPC()
                 time.sleep(3)
             except pypresence.exceptions.PipeClosed:
                 Presence.discord_was_closed()
@@ -921,6 +928,8 @@ def Remove_yaToken_From_Memmory():
     if keyring.get_password('WinYandexMusicRPC', 'token') is not None:
         keyring.delete_password('WinYandexMusicRPC', 'token')
         log("Old token has been removed from memory.", LogType.Update_Status)
+        global ya_token
+        ya_token = str()
 
 def update_token_task(icon_path, result_queue):
     result = getToken.update_token(icon_path)
@@ -942,6 +951,8 @@ def Init_yaToken(forceGet = False):
                 log(f"Successfully received the token: {Blur_string(token)}", LogType.Update_Status)
         except Exception as exception:
             log(f"Something happened when trying to initialize token: {exception}", LogType.Error)
+        finally:
+            Presence.need_restart()
     else:
         if not ya_token:
             try:
@@ -962,9 +973,13 @@ def Init_yaToken(forceGet = False):
             if Is_run_by_exe():
                 update_account_name(mainMenu, get_account_name())
         except Exception as exception:
-            Handle_exception(exception)  
+            Presence.client = None
+            Handle_exception(exception) 
+    else: 
+        Presence.client = None
+
     if not Presence.client:
-        log("Continue without a token...", LogType.Default)
+        log("Couldn't get the token. Try again.", LogType.Default)
                 
 
 
