@@ -821,6 +821,8 @@ def create_enum_menu(enum_class, get_setting_func, set_setting_func):
 
 
 def convert_to_enum(enum_class, value):
+    if isinstance(value, enum_class):
+        return value
     value_str = str(value)
     try:
         return enum_class[value_str]
