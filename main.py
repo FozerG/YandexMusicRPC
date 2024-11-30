@@ -45,14 +45,11 @@ CURRENT_VERSION = "v0.2.3"
 # Ссылка на репозиторий
 REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
 
-# (Опционально) Личный токен Яндекс.Музыки с подпиской Плюс
+# Личный токен Яндекс.Музыки
 # https://github.com/MarshalX/yandex-music-api/discussions/513
-# - Используется для поиска треков которые не показываются без авторизации
-# - Используется при использовании скрипта из стран, где бесплатная Яндекс.Музыка не работает
+# - Авторизация в Яндексе необходима для получения текущего трека с его серверов.
 ya_token = str()
 
-# Флаг для поиска трека с 100% совпадением названия и автора. Иначе будет найден близкий результат.
-strong_find = True
 
 # Флаг для настройки автозапуска с компьютером
 auto_start_windows = False
@@ -103,7 +100,7 @@ def extract_device_name(data):
 
         return next(
             (device["info"]["title"] for device in devices if device["info"]["device_id"] == active_device_id),
-            "Unknown",
+            "Desktop",
         )
     except KeyError as e:
         return f"error: {e}"
@@ -385,7 +382,6 @@ class Presence:
             try:
                 ongoing_track = Presence.getTrack()
                 if ongoing_track["success"]:
-                    trackTime = 0
                     is_new_track = Presence.currentTrack is None or Presence.currentTrack.get(
                         "label"
                     ) != ongoing_track.get("label")
@@ -411,20 +407,20 @@ class Presence:
                         log(f"Track {ongoing_track['label']} on pause", LogType.Update_Status)
                         Presence.update_presence(ongoing_track, paused=True)
                         Presence.paused = True
-                        trackTime = currentTime
+                        pausedTimestamp = currentTime
 
                     elif is_playing and Presence.paused:
                         log(f"Track {ongoing_track['label']} off pause.", LogType.Update_Status)
                         Presence.update_presence(ongoing_track, currentTime)
                         Presence.paused = False
                         Presence.currentTrack = ongoing_track
-                        trackTime = 0
+                        pausedTimestamp = 0
 
-                    if Presence.paused and trackTime != 0:
-                        Presence.paused_time = currentTime - trackTime
+                    if Presence.paused and pausedTimestamp != 0:
+                        Presence.paused_time = currentTime - pausedTimestamp
                         if Presence.paused_time > 5 * 60:  # Если пауза больше 5 минут
-                            trackTime = 0
                             Presence.rpc.clear()
+                            pausedTimestamp = 0
                             log("Clear RPC due to paused for more than 5 minutes", LogType.Update_Status)
                     else:
                         Presence.paused_time = 0
@@ -492,7 +488,6 @@ class Presence:
             track_info = current_state["track"]
             name_current = ", ".join(track_info["artists"]) + " - " + track_info["title"]
             global name_prev
-            global strong_find
             if str(name_current) != name_prev:
                 log(f'Now listening to "{name_current}" on device "{current_state["device_name"]}"')
             # Если песня уже играет, просто вернем её с актуальным статусом паузы и позиции.
@@ -662,13 +657,6 @@ def GetLastVersion(repoUrl):
 
     except requests.exceptions.RequestException as e:
         log(f"Error getting latest version: {e}", LogType.Error)
-
-
-# Функция для переключения состояния strong_find
-def toggle_strong_find():
-    global strong_find
-    strong_find = not strong_find
-    log(f"Bool strong_find set state: {strong_find}")
 
 
 # Функция для переключения состояния auto_start_windows
@@ -881,7 +869,6 @@ def update_account_name(icon, new_account_name):
     settingsMenu = pystray.Menu(
         pystray.MenuItem(f"Logged in as - {new_account_name}", lambda: None, enabled=False),
         pystray.MenuItem("Login to account...", lambda: Init_yaToken(True)),
-        pystray.MenuItem("Toggle strong_find", toggle_strong_find, checked=lambda item: strong_find),
     )
 
     icon.menu = pystray.Menu(
@@ -903,7 +890,6 @@ def create_tray_icon():
     settingsMenu = pystray.Menu(
         pystray.MenuItem(f"Logged in as - {account_name}", lambda: None, enabled=False),
         pystray.MenuItem("Login to account...", lambda: Init_yaToken(True)),
-        pystray.MenuItem("Toggle strong_find", toggle_strong_find, checked=lambda item: strong_find),
     )
 
     return pystray.Icon(
@@ -1082,7 +1068,7 @@ def Get_IconPath():
     try:
         if getattr(sys, "frozen", False):
             # Если скрипт был запущен с использованием PyInstaller
-            resources_path = os.path.dirname(sys.executable)
+            resources_path = sys._MEIPASS
         else:
             # Если скрипт запущен напрямую
             resources_path = os.path.dirname(os.path.realpath(__file__))
