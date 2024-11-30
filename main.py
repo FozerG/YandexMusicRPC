@@ -36,8 +36,8 @@ from enum import Enum
 from PIL import Image
 
 # Идентификатор клиента Discord для Rich Presence
-CLIENT_ID_EN = '1269807014393942046' # Yandex Music
-CLIENT_ID_RU_DECLINED = '1269826362399522849' # Яндекс Музыку (склонение для активности "Слушает")
+CLIENT_ID_EN = "1269807014393942046"  # Yandex Music
+CLIENT_ID_RU_DECLINED = "1269826362399522849"  # Яндекс Музыку (склонение для активности "Слушает")
 
 # Версия (tag) скрипта для проверки на актуальность через Github Releases
 CURRENT_VERSION = "v0.2.2"
@@ -47,7 +47,7 @@ REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
 
 # (Опционально) Личный токен Яндекс.Музыки с подпиской Плюс
 # https://github.com/MarshalX/yandex-music-api/discussions/513
-# - Используется для поиска треков которые не показываются без авторизации 
+# - Используется для поиска треков которые не показываются без авторизации
 # - Используется при использовании скрипта из стран, где бесплатная Яндекс.Музыка не работает
 ya_token = str()
 
@@ -102,11 +102,7 @@ def extract_device_name(data):
         active_device_id = data.get("active_device_id_optional")
 
         return next(
-            (
-                device["info"]["title"]
-                for device in devices
-                if device["info"]["device_id"] == active_device_id
-            ),
+            (device["info"]["title"] for device in devices if device["info"]["device_id"] == active_device_id),
             "Unknown",
         )
     except KeyError as e:
@@ -126,7 +122,7 @@ async def get_info():
                 track = Presence.client.tracks([track_id])
                 if not track or not track[0]:
                     log(f"Track with ID {track_id} not found.", LogType.Error)
-                    return {'success': False}
+                    return {"success": False}
                 return {
                     "success": True,
                     "track_id": track[0].track_id,
@@ -137,27 +133,21 @@ async def get_info():
                 }
             except Exception as e:
                 log(f"Failed to fetch track info for ID {track_id}: {str(e)}", LogType.Error)
-                return {'success': False}
+                return {"success": False}
 
     return Info(ya_token)
 
 
 async def get_current_track() -> dict:
     global ya_token
-    device_info = {
-        "app_name": "Chrome",
-        "type": 1,
-    }
+    device_info = {"app_name": "Chrome", "type": 1}
 
     ws_proto = {
         "Ynison-Device-Id": "".join([random.choice(string.ascii_lowercase) for _ in range(16)]),
-        "Ynison-Device-Info": json.dumps(device_info)
+        "Ynison-Device-Info": json.dumps(device_info),
     }
 
-    timeout = ClientTimeout(
-        total=15,
-        connect=10
-    )
+    timeout = ClientTimeout(total=15, connect=10)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.ws_connect(
@@ -166,14 +156,15 @@ async def get_current_track() -> dict:
                     "Sec-WebSocket-Protocol": f"Bearer, v2, {json.dumps(ws_proto)}",
                     "Origin": "https://music.yandex.ru",
                     "Authorization": f"OAuth {ya_token}",
-                }, timeout=10
+                },
+                timeout=10,
             ) as ws:
                 recv = await ws.receive()
                 data = json.loads(recv.data)
 
             if "redirect_ticket" not in data or "host" not in data:
                 log(f"Invalid response structure: {data}", LogType.Error)
-                return {'success': False}
+                return {"success": False}
 
             new_ws_proto = ws_proto.copy()
             new_ws_proto["Ynison-Redirect-Ticket"] = data["redirect_ticket"]
@@ -186,16 +177,14 @@ async def get_current_track() -> dict:
                             "entity_id": "",
                             "entity_type": "VARIOUS",
                             "playable_list": [],
-                            "options": {
-                                "repeat_mode": "NONE"
-                            },
+                            "options": {"repeat_mode": "NONE"},
                             "entity_context": "BASED_ON_ENTITY_BY_DEFAULT",
                             "version": {
                                 "device_id": ws_proto["Ynison-Device-Id"],
                                 "version": 9021243204784341000,
-                                "timestamp_ms": 0
+                                "timestamp_ms": 0,
                             },
-                            "from_optional": ""
+                            "from_optional": "",
                         },
                         "status": {
                             "duration_ms": 0,
@@ -205,32 +194,30 @@ async def get_current_track() -> dict:
                             "version": {
                                 "device_id": ws_proto["Ynison-Device-Id"],
                                 "version": 8321822175199937000,
-                                "timestamp_ms": 0
-                            }
-                        }
+                                "timestamp_ms": 0,
+                            },
+                        },
                     },
                     "device": {
                         "capabilities": {
                             "can_be_player": True,
                             "can_be_remote_controller": False,
-                            "volume_granularity": 16
+                            "volume_granularity": 16,
                         },
                         "info": {
                             "device_id": ws_proto["Ynison-Device-Id"],
                             "type": "WEB",
                             "title": "Chrome Browser",
-                            "app_name": "Chrome"
+                            "app_name": "Chrome",
                         },
-                        "volume_info": {
-                            "volume": 0
-                        },
-                        "is_shadow": True
+                        "volume_info": {"volume": 0},
+                        "is_shadow": True,
                     },
-                    "is_currently_active": False
+                    "is_currently_active": False,
                 },
                 "rid": "ac281c26-a047-4419-ad00-e4fbfda1cba3",
                 "player_action_timestamp_ms": 0,
-                "activity_interception_type": "DO_NOT_INTERCEPT_BY_DEFAULT"
+                "activity_interception_type": "DO_NOT_INTERCEPT_BY_DEFAULT",
             }
 
             async with session.ws_connect(
@@ -239,43 +226,44 @@ async def get_current_track() -> dict:
                     "Sec-WebSocket-Protocol": f"Bearer, v2, {json.dumps(new_ws_proto)}",
                     "Origin": "https://music.yandex.ru",
                     "Authorization": f"OAuth {ya_token}",
-                }, timeout=10,
-                method="GET"
+                },
+                timeout=10,
+                method="GET",
             ) as ws:
                 await ws.send_str(json.dumps(to_send))
                 recv = await asyncio.wait_for(ws.receive(), timeout=10)
                 ynison = json.loads(recv.data)
-                track_index = ynison['player_state']['player_queue']['current_playable_index']
+                track_index = ynison["player_state"]["player_queue"]["current_playable_index"]
                 if track_index == -1:
                     log("No track is currently playing.", LogType.Error)
-                    return {'success': False}
-                track = ynison['player_state']['player_queue']['playable_list'][track_index]
+                    return {"success": False}
+                track = ynison["player_state"]["player_queue"]["playable_list"][track_index]
 
             await session.close()
-            track = await (await get_info()).get_track_by_id(track['playable_id'])
+            track = await (await get_info()).get_track_by_id(track["playable_id"])
             return {
                 "device_name": extract_device_name(ynison),
-                "paused": ynison['player_state']['status']['paused'],
-                "duration_ms": ynison['player_state']['status']['duration_ms'],
-                "progress_ms": ynison['player_state']['status']['progress_ms'],
-                "entity_id": ynison['player_state']['player_queue']['entity_id'],
-                "repeat_mode": ynison['player_state']['player_queue']['options']['repeat_mode'],
-                "entity_type": ynison['player_state']['player_queue']['entity_type'],
+                "paused": ynison["player_state"]["status"]["paused"],
+                "duration_ms": ynison["player_state"]["status"]["duration_ms"],
+                "progress_ms": ynison["player_state"]["status"]["progress_ms"],
+                "entity_id": ynison["player_state"]["player_queue"]["entity_id"],
+                "repeat_mode": ynison["player_state"]["player_queue"]["options"]["repeat_mode"],
+                "entity_type": ynison["player_state"]["player_queue"]["entity_type"],
                 "track": track,
-                "success": True
+                "success": True,
             }
 
     except ClientConnectorError as e:
         log(f"Cannot connect to host: {e}. Please check your connection.", LogType.Error)
-        return {'success': False}
+        return {"success": False}
 
     except asyncio.TimeoutError:
         log("Request timed out. Please check your connection.", LogType.Error)
-        return {'success': False}
+        return {"success": False}
 
     except Exception as e:
         log(f"An unexpected error occurred: {str(e)}", LogType.Error)
-        return {'success': False}
+        return {"success": False}
     finally:
         if session:
             await session.close()
@@ -297,8 +285,7 @@ class Presence:
     @staticmethod
     def connect_rpc():
         try:
-            client_id = CLIENT_ID_EN if language_config == LanguageConfig.ENGLISH else \
-                CLIENT_ID_RU_DECLINED
+            client_id = CLIENT_ID_EN if language_config == LanguageConfig.ENGLISH else CLIENT_ID_RU_DECLINED
             rpc = pypresence.Presence(client_id)
             rpc.connect()
             return rpc
@@ -379,8 +366,11 @@ class Presence:
         while Presence.running:
             if not Presence.client:
                 if not clientErrorShown:
-                    log("To work, you need to log in to your Yandex account. Tray -> Yandex Settings -> Login to "
-                        "account.", LogType.Error)
+                    log(
+                        "To work, you need to log in to your Yandex account. Tray -> Yandex Settings -> Login to "
+                        "account.",
+                        LogType.Error,
+                    )
                     clientErrorShown = True
                 time.sleep(3)
                 continue
@@ -394,16 +384,14 @@ class Presence:
 
             try:
                 ongoing_track = Presence.getTrack()
-                if ongoing_track['success']:
+                if ongoing_track["success"]:
                     trackTime = 0
-                    is_new_track = (
-                            Presence.currentTrack is None or
-                            Presence.currentTrack.get('label') != ongoing_track.get('label')
-                    )
-                    is_start_time_changed = (
-                        Presence.currentTrack and
-                        Presence.currentTrack.get('start-time') != ongoing_track.get('start-time')
-                    )
+                    is_new_track = Presence.currentTrack is None or Presence.currentTrack.get(
+                        "label"
+                    ) != ongoing_track.get("label")
+                    is_start_time_changed = Presence.currentTrack and Presence.currentTrack.get(
+                        "start-time"
+                    ) != ongoing_track.get("start-time")
                     is_paused = ongoing_track["playback"] != PlaybackStatus.Playing
                     is_playing = not is_paused
                     if is_new_track:
@@ -450,8 +438,8 @@ class Presence:
 
     @staticmethod
     def update_presence(ongoing_track, current_time=0, paused=False):
-        start_time = current_time - int(ongoing_track['start-time'].total_seconds())
-        end_time = start_time + ongoing_track['durationSec']
+        start_time = current_time - int(ongoing_track["start-time"].total_seconds())
+        end_time = start_time + ongoing_track["durationSec"]
 
         if language_config == LanguageConfig.RUSSIAN:
             playing_text = "Проигрывается"
@@ -461,35 +449,35 @@ class Presence:
             paused_text = "On pause"
 
         presence_args = {
-            'activity_type': 2,
-            'details': ongoing_track['title'],
-            'large_image': ongoing_track['og-image'],
-            'small_image': (
+            "activity_type": 2,
+            "details": ongoing_track["title"],
+            "large_image": ongoing_track["og-image"],
+            "small_image": (
                 "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Paused.png?raw=true"
                 if paused
                 else "https://github.com/FozerG/YandexMusicRPC/blob/main/assets/Playing.png?raw=true"
             ),
-            'small_text': paused_text if paused else playing_text
+            "small_text": paused_text if paused else playing_text,
         }
 
-        if ongoing_track['artist']:
-            presence_args['state'] = ongoing_track['artist']
+        if ongoing_track["artist"]:
+            presence_args["state"] = ongoing_track["artist"]
 
-        if ongoing_track['album'] != ongoing_track['title']:
-            presence_args['large_text'] = ongoing_track['album']
+        if ongoing_track["album"] != ongoing_track["title"]:
+            presence_args["large_text"] = ongoing_track["album"]
 
         if paused:
-            presence_args['large_text'] = (
+            presence_args["large_text"] = (
                 f"{paused_text} "
                 f"{format_duration(int(ongoing_track['start-time'].total_seconds() * 1000))} / "
                 f"{ongoing_track['formatted_duration']}"
             )
         else:
-            presence_args['start'] = start_time
-            presence_args['end'] = end_time
+            presence_args["start"] = start_time
+            presence_args["end"] = end_time
 
         if button_config != ButtonConfig.NEITHER:
-            presence_args['buttons'] = build_buttons(ongoing_track['link'])
+            presence_args["buttons"] = build_buttons(ongoing_track["link"])
 
         Presence.rpc.update(**presence_args)
 
@@ -498,11 +486,11 @@ class Presence:
     def getTrack() -> dict:
         try:
             current_state = asyncio.run(get_current_track())
-            if not current_state['success'] or not current_state["track"]['success']:
+            if not current_state["success"] or not current_state["track"]["success"]:
                 log("Not successfully get all the information about the track.", LogType.Error)
-                return {'success': False}
+                return {"success": False}
             track_info = current_state["track"]
-            name_current = ", ".join(track_info['artists']) + " - " + track_info['title']
+            name_current = ", ".join(track_info["artists"]) + " - " + track_info["title"]
             global name_prev
             global strong_find
             if str(name_current) != name_prev:
@@ -512,8 +500,7 @@ class Presence:
                 currentTrack_copy = Presence.currentTrack.copy()
                 currentTrack_copy["start-time"] = timedelta(milliseconds=int(current_state["progress_ms"]))
                 currentTrack_copy["playback"] = (
-                    PlaybackStatus.Paused if current_state["paused"]
-                    else PlaybackStatus.Playing
+                    PlaybackStatus.Paused if current_state["paused"] else PlaybackStatus.Playing
                 )
                 return currentTrack_copy
 
@@ -522,21 +509,21 @@ class Presence:
             if track_info:
                 duration_ms = int(current_state["duration_ms"])
                 return {
-                    'success': True,
-                    'title': Single_char(TrimString(track_info["title"], 40)),
-                    'artist': Single_char(TrimString(f"{', '.join(track_info['artists'])}", 40)),
-                    'album':    Single_char(TrimString(track_info["album"], 25)),
-                    'label': TrimString(f"{', '.join(track_info['artists'])} - {track_info['title']}", 60),
-                    'link': f"https://music.yandex.ru/album/{trackId[1]}/track/{trackId[0]}/",
-                    'durationSec': duration_ms // 1000,
-                    'formatted_duration': format_duration(duration_ms),
-                    'start-time': timedelta(milliseconds=int(current_state["progress_ms"])),
-                    'playback': PlaybackStatus.Paused if current_state["paused"] else PlaybackStatus.Playing,
-                    'og-image': "https://" + track_info["og-image"][:-2] + "400x400"
+                    "success": True,
+                    "title": Single_char(TrimString(track_info["title"], 40)),
+                    "artist": Single_char(TrimString(f"{', '.join(track_info['artists'])}", 40)),
+                    "album": Single_char(TrimString(track_info["album"], 25)),
+                    "label": TrimString(f"{', '.join(track_info['artists'])} - {track_info['title']}", 60),
+                    "link": f"https://music.yandex.ru/album/{trackId[1]}/track/{trackId[0]}/",
+                    "durationSec": duration_ms // 1000,
+                    "formatted_duration": format_duration(duration_ms),
+                    "start-time": timedelta(milliseconds=int(current_state["progress_ms"])),
+                    "playback": PlaybackStatus.Paused if current_state["paused"] else PlaybackStatus.Playing,
+                    "og-image": "https://" + track_info["og-image"][:-2] + "400x400",
                 }
         except Exception as exception:
             Handle_exception(exception)
-            return {'success': False}
+            return {"success": False}
 
 
 def format_duration(duration_ms):
@@ -554,23 +541,23 @@ def format_duration(duration_ms):
 def build_buttons(url):
     def create_button(label_en, label_ru, url_btn):
         label_lang = label_en if language_config == LanguageConfig.ENGLISH else label_ru
-        return {'label': label_lang, 'url': url_btn}
+        return {"label": label_lang, "url": url_btn}
 
     buttons = []
 
     if button_config == ButtonConfig.YANDEX_MUSIC_WEB:
-        buttons.append(create_button('Listen on Yandex Music', 'Откр. в браузере', url))
+        buttons.append(create_button("Listen on Yandex Music", "Откр. в браузере", url))
     elif button_config == ButtonConfig.YANDEX_MUSIC_APP:
         deep_link = extract_deep_link(url)
-        buttons.append(create_button('Listen on Yandex Music (in App)', 'Откр. в прилож.', deep_link))
+        buttons.append(create_button("Listen on Yandex Music (in App)", "Откр. в прилож.", deep_link))
     elif button_config == ButtonConfig.BOTH:
-        buttons.append(create_button('Listen on Yandex Music (Web)', 'Откр. в браузере', url))
+        buttons.append(create_button("Listen on Yandex Music (Web)", "Откр. в браузере", url))
         deep_link = extract_deep_link(url)
-        buttons.append(create_button('Listen on Yandex Music (App)', 'Откр. в прилож.', deep_link))
+        buttons.append(create_button("Listen on Yandex Music (App)", "Откр. в прилож.", deep_link))
 
     for button in buttons:
-        label = button['label']
-        if len(label.encode('utf-8')) > 32:
+        label = button["label"]
+        if len(label.encode("utf-8")) > 32:
             raise ValueError(f"Label '{label}' exceeds 32 bytes")
     return buttons
 
@@ -585,18 +572,21 @@ def extract_deep_link(url):
         return None
 
 
-def Handle_exception(exception): # Обработка json ошибок из Yandex Music
+def Handle_exception(exception):  # Обработка json ошибок из Yandex Music
     json_str = str(exception).replace("'", '"')
-    if match := re.search(r'({.*?})', json_str):
+    if match := re.search(r"({.*?})", json_str):
         json_str = match[1]
 
     try:
         data = json.loads(json_str)
-        if error_name := data.get('name'):
-            if error_name == 'Unavailable For Legal Reasons':
-                log("You are using Yandex music in a country where it is not available without authorization! Turn "
-                    "off VPN or login using a Yandex token.", LogType.Error)
-            elif error_name == 'session-expired':
+        if error_name := data.get("name"):
+            if error_name == "Unavailable For Legal Reasons":
+                log(
+                    "You are using Yandex music in a country where it is not available without authorization! Turn "
+                    "off VPN or login using a Yandex token.",
+                    LogType.Error,
+                )
+            elif error_name == "session-expired":
                 log("Your Yandex token is out of date or incorrect, login again.", LogType.Error)
             else:
                 log(f"Something happened: {exception}", LogType.Error)
@@ -633,7 +623,7 @@ class LogType(Enum):
 
 
 def log(text, type=LogType.Default):
-    init() # Инициализация colorama
+    init()  # Инициализация colorama
     # Цвета текста
     red_text = Fore.RED
     yellow_text = Fore.YELLOW
@@ -655,9 +645,9 @@ def log(text, type=LogType.Default):
 def GetLastVersion(repoUrl):
     try:
         global CURRENT_VERSION
-        response = requests.get(f'{repoUrl}/releases/latest', timeout=5)
+        response = requests.get(f"{repoUrl}/releases/latest", timeout=5)
         response.raise_for_status()
-        latest_version = response.url.split('/')[-1]
+        latest_version = response.url.split("/")[-1]
 
         if version.parse(CURRENT_VERSION) < version.parse(latest_version):
             log(
@@ -678,18 +668,18 @@ def GetLastVersion(repoUrl):
 def toggle_strong_find():
     global strong_find
     strong_find = not strong_find
-    log(f'Bool strong_find set state: {strong_find}')
+    log(f"Bool strong_find set state: {strong_find}")
 
 
 # Функция для переключения состояния auto_start_windows
 def toggle_auto_start_windows():
     global auto_start_windows
     auto_start_windows = not auto_start_windows
-    log(f'Bool auto_start_windows set state: {auto_start_windows}')
+    log(f"Bool auto_start_windows set state: {auto_start_windows}")
 
     def create_shortcut(target, shortcut_path, description="", arguments=""):
         pythoncom.CoInitialize()  # Инициализируем COM библиотеки
-        shell = Dispatch('WScript.Shell')  # Создаем объект для работы с ярлыками
+        shell = Dispatch("WScript.Shell")  # Создаем объект для работы с ярлыками
         shortcut = shell.CreateShortcut(shortcut_path)  # Создаем ярлык
         shortcut.TargetPath = target  # Устанавливаем путь к исполняемому файлу
         shortcut.WorkingDirectory = os.path.dirname(target)  # Устанавливаем рабочую директорию
@@ -697,39 +687,57 @@ def toggle_auto_start_windows():
         shortcut.Arguments = arguments
         shortcut.Save()  # Сохраняем ярлык
 
-    def change_setting(tglle: bool): # Выношу в отдельную функцию, чтобы иметь возможность запустить в отдельном потоке,
-        # ДВА способа добавления в автозапуск. 
-        # Первый через добавление программы в папку автостарта. 
-        # Второй через изменение реестра. 
+    def change_setting(
+        tglle: bool,
+    ):  # Выношу в отдельную функцию, чтобы иметь возможность запустить в отдельном потоке,
+        # ДВА способа добавления в автозапуск.
+        # Первый через добавление программы в папку автостарта.
+        # Второй через изменение реестра.
         # Оба не требуют прав администратора.
         if tglle:
             try:
                 # Получаем абсолютный путь к текущему исполняемому файлу
                 exe_path = os.path.abspath(sys.argv[0])
                 # Определяем путь для ярлыка в автозагрузке
-                shortcut_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs',
-                                             'Startup', 'YandexMusicRPC.lnk')
+                shortcut_path = os.path.join(
+                    os.getenv("APPDATA"),
+                    "Microsoft",
+                    "Windows",
+                    "Start Menu",
+                    "Programs",
+                    "Startup",
+                    "YandexMusicRPC.lnk",
+                )
                 # Создаем ярлык в автозагрузке
                 create_shortcut(exe_path, shortcut_path, arguments="--run-through-startup")
             except Exception:
                 exe_path = f'"{os.path.abspath(sys.argv[0])}" --run-through-startup'
                 # Открываем ключ реестра для автозапуска программ
-                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
-                                     0, winreg.KEY_SET_VALUE)
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+                    0,
+                    winreg.KEY_SET_VALUE,
+                )
                 # Устанавливаем новый параметр в реестре с именем 'YandexMusicRPC' и значением пути к исполняемому файлу
-                winreg.SetValueEx(key, 'YandexMusicRPC', 0, winreg.REG_SZ, exe_path)
+                winreg.SetValueEx(key, "YandexMusicRPC", 0, winreg.REG_SZ, exe_path)
                 winreg.CloseKey(key)  # Закрываем ключ реестра
-        else: # Удаляем оба метода
+        else:  # Удаляем оба метода
             # Удаляем ярлык из автозагрузки
-            shortcut_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs',
-                                         'Startup', 'YandexMusicRPC.lnk')
+            shortcut_path = os.path.join(
+                os.getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "YandexMusicRPC.lnk"
+            )
             if os.path.exists(shortcut_path):
                 os.remove(shortcut_path)
             # Удаляем запись из реестра
             with contextlib.suppress(FileNotFoundError):
-                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run',
-                                     0, winreg.KEY_ALL_ACCESS)
-                winreg.DeleteValue(key, 'YandexMusicRPC')
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+                    0,
+                    winreg.KEY_ALL_ACCESS,
+                )
+                winreg.DeleteValue(key, "YandexMusicRPC")
                 winreg.CloseKey(key)
 
     # Запускаем в отдельном потоке для оптимизации
@@ -739,17 +747,18 @@ def toggle_auto_start_windows():
 # Функция, которая при запуске программы проверяет, есть ли программа в автозапуске.
 # Используется при подгрузке стартовых параметров
 def is_in_autostart():
-
     def is_in_startup():
-        shortcut_path = os.path.join(os.getenv('APPDATA'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup',
-                                     'YandexMusicRPC.lnk')  # Определяем путь к ярлыку
+        shortcut_path = os.path.join(
+            os.getenv("APPDATA"), "Microsoft", "Windows", "Start Menu", "Programs", "Startup", "YandexMusicRPC.lnk"
+        )  # Определяем путь к ярлыку
         return os.path.exists(shortcut_path)  # Проверяем, существует ли ярлык в папке автозагрузки
 
     def is_in_registry():
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'SOFTWARE\Microsoft\Windows\CurrentVersion\Run',
-                                 0, winreg.KEY_READ)  # Открываем ключ реестра для чтения
-            winreg.QueryValueEx(key, 'YandexMusicRPC')  # Проверяем, существует ли параметр в реестре
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_READ
+            )  # Открываем ключ реестра для чтения
+            winreg.QueryValueEx(key, "YandexMusicRPC")  # Проверяем, существует ли параметр в реестре
             winreg.CloseKey(key)  # Закрываем ключ реестра
             return True
         except FileNotFoundError:
@@ -769,7 +778,7 @@ def toggle_console():
 def tray_click(icon, query):
     match str(query):
         case "GitHub":
-            webbrowser.open(REPO_URL,  new=2)
+            webbrowser.open(REPO_URL, new=2)
 
         case "Exit":
             Presence.stop()
@@ -797,13 +806,18 @@ def get_saves_settings(fromStart=False):
     global auto_start_windows
 
     auto_start_windows = is_in_autostart()
-    button_config = config_manager.get_enum_setting('UserSettings', 'buttons_settings', ButtonConfig,
-                                                    fallback=ButtonConfig.BOTH)
-    language_config = config_manager.get_enum_setting('UserSettings', 'language', LanguageConfig,
-                                                      fallback=LanguageConfig.RUSSIAN)
+    button_config = config_manager.get_enum_setting(
+        "UserSettings", "buttons_settings", ButtonConfig, fallback=ButtonConfig.BOTH
+    )
+    language_config = config_manager.get_enum_setting(
+        "UserSettings", "language", LanguageConfig, fallback=LanguageConfig.RUSSIAN
+    )
     if fromStart:
-        log(f"Loaded settings: {Style.RESET_ALL}button_config = {button_config.name}, "
-            f"language_config = {language_config.name}", LogType.Update_Status)
+        log(
+            f"Loaded settings: {Style.RESET_ALL}button_config = {button_config.name}, "
+            f"language_config = {language_config.name}",
+            LogType.Update_Status,
+        )
 
 
 # Функция для создания меню на основе переданных параметров
@@ -812,12 +826,10 @@ def create_enum_menu(enum_class, get_setting_func, set_setting_func):
         return pystray.MenuItem(
             value.name,
             lambda item: set_setting_func(value),
-            checked=lambda item: get_setting_func('UserSettings', enum_class) == value
+            checked=lambda item: get_setting_func("UserSettings", enum_class) == value,
         )
 
-    return pystray.Menu(
-        *[create_item(value) for value in enum_class]
-    )
+    return pystray.Menu(*[create_item(value) for value in enum_class])
 
 
 def convert_to_enum(enum_class, value):
@@ -831,7 +843,7 @@ def convert_to_enum(enum_class, value):
 
 def set_button_config(value):
     value = convert_to_enum(ButtonConfig, value)
-    config_manager.set_enum_setting('UserSettings', 'buttons_settings', value)
+    config_manager.set_enum_setting("UserSettings", "buttons_settings", value)
     log(f"Setting has been changed : buttons_settings to {value.name}")
     get_saves_settings()
     Presence.need_restart()
@@ -839,7 +851,7 @@ def set_button_config(value):
 
 def set_language_config(value):
     value = convert_to_enum(LanguageConfig, value)
-    config_manager.set_enum_setting('UserSettings', 'language', value)
+    config_manager.set_enum_setting("UserSettings", "language", value)
     log(f"Setting has been changed : language to {value.name}")
     get_saves_settings()
     Presence.need_restart()
@@ -848,19 +860,18 @@ def set_language_config(value):
 # Функция для создания настроек меню RPC
 def create_rpc_settings_menu():
     button_config_menu = create_enum_menu(
-        ButtonConfig, lambda section, enum_type: config_manager.get_enum_setting(
-            section, 'buttons_settings', enum_type
-        ), set_button_config
+        ButtonConfig,
+        lambda section, enum_type: config_manager.get_enum_setting(section, "buttons_settings", enum_type),
+        set_button_config,
     )
     language_config_menu = create_enum_menu(
-        LanguageConfig, lambda section, enum_type: config_manager.get_enum_setting(
-            section, 'language', enum_type
-        ), set_language_config
+        LanguageConfig,
+        lambda section, enum_type: config_manager.get_enum_setting(section, "language", enum_type),
+        set_language_config,
     )
 
     return pystray.Menu(
-        pystray.MenuItem('RPC Buttons', button_config_menu),
-        pystray.MenuItem("RPC Language", language_config_menu),
+        pystray.MenuItem("RPC Buttons", button_config_menu), pystray.MenuItem("RPC Language", language_config_menu)
     )
 
 
@@ -869,17 +880,17 @@ def update_account_name(icon, new_account_name):
     rpcSettingsMenu = create_rpc_settings_menu()
     settingsMenu = pystray.Menu(
         pystray.MenuItem(f"Logged in as - {new_account_name}", lambda: None, enabled=False),
-        pystray.MenuItem('Login to account...', lambda: Init_yaToken(True)),
-        pystray.MenuItem('Toggle strong_find', toggle_strong_find, checked=lambda item: strong_find)
+        pystray.MenuItem("Login to account...", lambda: Init_yaToken(True)),
+        pystray.MenuItem("Toggle strong_find", toggle_strong_find, checked=lambda item: strong_find),
     )
 
     icon.menu = pystray.Menu(
         pystray.MenuItem("Hide/Show Console", toggle_console, default=True),
-        pystray.MenuItem('Start with Windows', toggle_auto_start_windows, checked=lambda item: auto_start_windows),
+        pystray.MenuItem("Start with Windows", toggle_auto_start_windows, checked=lambda item: auto_start_windows),
         pystray.MenuItem("Yandex settings", settingsMenu),
         pystray.MenuItem("RPC settings", rpcSettingsMenu),
         pystray.MenuItem("GitHub", tray_click),
-        pystray.MenuItem("Exit", tray_click)
+        pystray.MenuItem("Exit", tray_click),
     )
 
 
@@ -891,8 +902,8 @@ def create_tray_icon():
 
     settingsMenu = pystray.Menu(
         pystray.MenuItem(f"Logged in as - {account_name}", lambda: None, enabled=False),
-        pystray.MenuItem('Login to account...', lambda: Init_yaToken(True)),
-        pystray.MenuItem('Toggle strong_find', toggle_strong_find, checked=lambda item: strong_find),
+        pystray.MenuItem("Login to account...", lambda: Init_yaToken(True)),
+        pystray.MenuItem("Toggle strong_find", toggle_strong_find, checked=lambda item: strong_find),
     )
 
     return pystray.Icon(
@@ -900,14 +911,8 @@ def create_tray_icon():
         tray_image,
         "YandexMusicRPC",
         menu=pystray.Menu(
-            pystray.MenuItem(
-                "Hide/Show Console", toggle_console, default=True
-            ),
-            pystray.MenuItem(
-                'Start with Windows',
-                toggle_auto_start_windows,
-                checked=lambda item: auto_start_windows,
-            ),
+            pystray.MenuItem("Hide/Show Console", toggle_console, default=True),
+            pystray.MenuItem("Start with Windows", toggle_auto_start_windows, checked=lambda item: auto_start_windows),
             pystray.MenuItem("Yandex settings", settingsMenu),
             pystray.MenuItem("RPC settings", rpcSettingsMenu),
             pystray.MenuItem("GitHub", tray_click),
@@ -930,9 +935,9 @@ def Is_windows_11():
 
 
 def Check_conhost():
-    if Is_windows_11() and '--run-through-conhost' not in sys.argv:
+    if Is_windows_11() and "--run-through-conhost" not in sys.argv:
         _extracted_from_Check_conhost_3()
-    if ('--run-through-launcher' in sys.argv or '--run-through-conhost' in sys.argv) and len(sys.argv) > 2:
+    if ("--run-through-launcher" in sys.argv or "--run-through-conhost" in sys.argv) and len(sys.argv) > 2:
         first_pid = int(sys.argv[2])
         try:
             parent_process = psutil.Process(first_pid)
@@ -949,8 +954,10 @@ def _extracted_from_Check_conhost_3():
     print("Wait a few seconds for the script to load...")
     script_path = os.path.abspath(sys.argv[0])
     first_pid = os.getpid()
-    subprocess.Popen(['start', '/min', 'conhost.exe', script_path, '--run-through-conhost', str(first_pid)] +
-                     sys.argv[1:], shell=True)
+    subprocess.Popen(
+        ["start", "/min", "conhost.exe", script_path, "--run-through-conhost", str(first_pid)] + sys.argv[1:],
+        shell=True,
+    )
     event = threading.Event()
     event.wait()
 
@@ -964,7 +971,7 @@ def Check_run_by_startup():
     # Если приложение запущено через автозагрузку, скрываем окно консоли сразу.
     # Если приложение запущено вручную, показываем окно консоли на 3 секунды и затем сворачиваем.
     if window:
-        if '--run-through-startup' not in sys.argv:
+        if "--run-through-startup" not in sys.argv:
             Show_Console_Permanent()
             log("Minimize to system tray in 3 seconds...")
             time.sleep(3)
@@ -975,7 +982,7 @@ def Check_run_by_startup():
 
 def Run_by_startup_without_conhost():
     if console_window := win32console.GetConsoleWindow():
-        if '--run-through-startup' in sys.argv:
+        if "--run-through-startup" in sys.argv:
             win32gui.ShowWindow(console_window, win32con.SW_HIDE)
     else:
         log("Console window not found", LogType.Error)
@@ -997,7 +1004,7 @@ def Set_ConsoleMode():
 
 def Is_run_by_exe():
     script_path = os.path.abspath(sys.argv[0])
-    return bool(script_path.endswith('.exe'))
+    return bool(script_path.endswith(".exe"))
 
 
 def contains_non_latin_chars(s):
@@ -1008,13 +1015,13 @@ def contains_non_latin_chars(s):
 
 def Blur_string(s: str) -> str:
     if s is None:
-        return ''
-    return s if len(s) <= 8 else s[:4] + '*' * (len(s) - 8) + s[-4:]
+        return ""
+    return s if len(s) <= 8 else s[:4] + "*" * (len(s) - 8) + s[-4:]
 
 
 def Remove_yaToken_From_Memory():
-    if keyring.get_password('WinYandexMusicRPC', 'token') is not None:
-        keyring.delete_password('WinYandexMusicRPC', 'token')
+    if keyring.get_password("WinYandexMusicRPC", "token") is not None:
+        keyring.delete_password("WinYandexMusicRPC", "token")
         log("Old token has been removed from memory.", LogType.Update_Status)
         global ya_token
         ya_token = str()
@@ -1037,7 +1044,7 @@ def Init_yaToken(forceGet=False):
             process.join()
             token = result_queue.get()
             if token is not None and len(token) > 10:
-                keyring.set_password('WinYandexMusicRPC', 'token', token)
+                keyring.set_password("WinYandexMusicRPC", "token", token)
                 log(f"Successfully received the token: {Blur_string(token)}", LogType.Update_Status)
         except Exception as exception:
             log(f"Something happened when trying to initialize token: {exception}", LogType.Error)
@@ -1049,7 +1056,7 @@ def Init_yaToken(forceGet=False):
 
     else:
         try:
-            token = keyring.get_password('WinYandexMusicRPC', 'token')
+            token = keyring.get_password("WinYandexMusicRPC", "token")
             if token:
                 log(f"Loaded token: {Blur_string(token)}", LogType.Update_Status)
         except Exception as exception:
@@ -1073,7 +1080,7 @@ def Init_yaToken(forceGet=False):
 
 def Get_IconPath():
     try:
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             # Если скрипт был запущен с использованием PyInstaller
             resources_path = os.path.dirname(sys.executable)
         else:
@@ -1085,7 +1092,7 @@ def Get_IconPath():
         return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     multiprocessing.freeze_support()
     try:
         if Is_run_by_exe():
@@ -1115,8 +1122,8 @@ if __name__ == '__main__':
             # Отключение кнопки закрытия консоли
             Disable_close_button()
             Check_run_by_startup()
-        else: # Запуск без exe (например в visual studio code)
-            get_saves_settings(True) # Загрузка настроек
+        else:  # Запуск без exe (например в visual studio code)
+            get_saves_settings(True)  # Загрузка настроек
             log("Launched without minimizing to tray and other and other gui functions")
 
         # Проверка наличия токена в памяти
@@ -1129,7 +1136,7 @@ if __name__ == '__main__':
                 LogType.Error,
             )
 
-        # Запуск Presence   
+        # Запуск Presence
         Presence.start()
 
     except KeyboardInterrupt:
