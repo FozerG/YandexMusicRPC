@@ -1,6 +1,7 @@
 import configparser
 import os
 
+
 class ConfigManager:
     def __init__(self, config_file='settings.ini', temp_dir_name="YandexMusicRPC"):
         self.temp_dir = os.path.join(os.getenv('LOCALAPPDATA'), temp_dir_name)
@@ -21,10 +22,9 @@ class ConfigManager:
     def get_setting(self, section, option, fallback=None):
         if self.config.has_option(section, option):
             return self.config.get(section, option)
-        else:
-            if fallback is not None:
-                self.set_setting(section, option, fallback)
-            return fallback
+        if fallback is not None:
+            self.set_setting(section, option, fallback)
+        return fallback
 
     def set_setting(self, section, option, value):
         if not self.config.has_section(section):
@@ -43,6 +43,5 @@ class ConfigManager:
         value = self.get_setting(section, option, fallback=fallback.name if fallback else None)
         if value in enum_type.__members__:
             return enum_type[value]
-        else:
-            self.set_enum_setting(section, option, fallback)
-            return fallback
+        self.set_enum_setting(section, option, fallback)
+        return fallback
