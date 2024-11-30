@@ -34,6 +34,7 @@ import threading
 import pythoncom
 from enum import Enum
 from PIL import Image
+
 # Идентификатор клиента Discord для Rich Presence
 CLIENT_ID_EN = '1269807014393942046' # Yandex Music
 CLIENT_ID_RU_DECLINED = '1269826362399522849' # Яндекс Музыку (склонение для активности "Слушает")
@@ -96,7 +97,6 @@ class PlaybackStatus(Enum):
 
 
 def extract_device_name(data):
-    print(data)
     try:
         devices = data.get("devices", [])
         active_device_id = data.get("active_device_id_optional")
