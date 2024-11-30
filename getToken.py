@@ -4,10 +4,12 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtGui import QIcon
 import sys
 
+
 class CustomWebEnginePage(QWebEnginePage):
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceId):
         pass
-    
+
+
 class TokenWindow(QMainWindow):
     def __init__(self, url, icon_path):
         super().__init__()
@@ -36,9 +38,11 @@ class TokenWindow(QMainWindow):
             self.token = url_str.split("=")[1].split("&")[0]
             self.close()
 
+
 def update_token(icon_path):
     app = QApplication(sys.argv)
-    oauth_url = "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d" # Official link to OAuth Yandex.Music
+    # Official link to OAuth Yandex.Music
+    oauth_url = "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d"
     token_window = TokenWindow(oauth_url, icon_path)
     token_window.show()
     app.exec_()
