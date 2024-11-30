@@ -944,7 +944,6 @@ def Check_conhost():
             print(f"Couldn't close the process: {first_pid}")
 
 
-# TODO Rename this here and in `Check_conhost`
 def _extracted_from_Check_conhost_3():
     Run_by_startup_without_conhost()
     print("Wait a few seconds for the script to load...")
