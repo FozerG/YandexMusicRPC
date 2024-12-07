@@ -5,6 +5,8 @@
 
 >[Мы будем пользоваться тем, что нам нравится.](https://github.com/Flowseal/zapret-discord-youtube)
 
+### Текущий статус скрипта - ❌ (07.12 ожидание фикса от Яндекса)
+
 **Discord RPC для показа текущего трека играющего в Яндекс Музыке.**  
 
 **Это форк [WinYandexMusicRPC](https://github.com/FozerG/WinYandexMusicRPC) который работает по другому.**
