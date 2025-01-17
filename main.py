@@ -40,7 +40,7 @@ CLIENT_ID_EN = "1269807014393942046"  # Yandex Music
 CLIENT_ID_RU_DECLINED = "1269826362399522849"  # Яндекс Музыку (склонение для активности "Слушает")
 
 # Версия (tag) скрипта для проверки на актуальность через Github Releases
-CURRENT_VERSION = "v0.2.3"
+CURRENT_VERSION = "v0.3"
 
 # Ссылка на репозиторий
 REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
@@ -56,7 +56,8 @@ auto_start_windows = False
 
 # --------- Переменные ниже являются временными и не требуют изменения.
 # Переменная для хранения предыдущего трека и избежания дублирования обновлений.
-name_prev = str()
+playable_id_prev = None
+info_cache = dict()
 
 # Переменная для хранения полного пути к иконке
 icoPath = str()
@@ -106,7 +107,7 @@ def extract_device_name(data):
         return f"error: {e}"
 
 
-async def get_info():
+def get_info():
     global ya_token
 
     class Info:
@@ -114,7 +115,7 @@ async def get_info():
             self.token = token
 
         @staticmethod
-        async def get_track_by_id(track_id):
+        def get_track_by_id(track_id):
             try:
                 track = Presence.client.tracks([track_id])
                 if not track or not track[0]:
@@ -208,7 +209,7 @@ async def get_current_track() -> dict:
                             "app_name": "Chrome",
                         },
                         "volume_info": {"volume": 0},
-                        "is_shadow": True,
+                        "is_shadow": False,
                     },
                     "is_currently_active": False,
                 },
@@ -237,7 +238,6 @@ async def get_current_track() -> dict:
                 track = ynison["player_state"]["player_queue"]["playable_list"][track_index]
 
             await session.close()
-            track = await (await get_info()).get_track_by_id(track["playable_id"])
             return {
                 "device_name": extract_device_name(ynison),
                 "paused": ynison["player_state"]["status"]["paused"],
@@ -246,7 +246,7 @@ async def get_current_track() -> dict:
                 "entity_id": ynison["player_state"]["player_queue"]["entity_id"],
                 "repeat_mode": ynison["player_state"]["player_queue"]["options"]["repeat_mode"],
                 "entity_type": ynison["player_state"]["player_queue"]["entity_type"],
-                "track": track,
+                "playable_id": track["playable_id"],
                 "success": True,
             }
 
@@ -326,8 +326,8 @@ class Presence:
     @staticmethod
     def restart() -> None:
         Presence.currentTrack = None
-        global name_prev
-        name_prev = None
+        global playable_id_prev
+        playable_id_prev = None
         if Presence.rpc:
             Presence.rpc.close()
             Presence.rpc = None
@@ -338,16 +338,16 @@ class Presence:
     def discord_was_closed() -> None:
         log("Discord was closed. Waiting for restart...", LogType.Error)
         Presence.currentTrack = None
-        global name_prev
-        name_prev = None
+        global playable_id_prev
+        playable_id_prev = None
         Presence.discord_available()
 
     @staticmethod
     def FullClearRPC() -> None:
         log("Clear RPC due to error", LogType.Error)
         Presence.currentTrack = None
-        global name_prev
-        name_prev = None
+        global playable_id_prev
+        playable_id_prev = None
         Presence.rpc.clear()
 
     # Метод для запуска Rich Presence.
@@ -480,15 +480,30 @@ class Presence:
     # Метод для получения информации о текущем треке.
     @staticmethod
     def getTrack() -> dict:
+        global playable_id_prev
+        global info_cache
         try:
             current_state = asyncio.run(get_current_track())
-            if not current_state["success"] or not current_state["track"]["success"]:
-                log("Not successfully get all the information about the track.", LogType.Error)
+            if not (current_state and isinstance(current_state, dict) and current_state.get('success') is True):
+                log("Failed to receive data from ynison.", LogType.Error)
                 return {"success": False}
-            track_info = current_state["track"]
+            
+            current_playable_id = current_state["playable_id"]
+            isNewTrack = playable_id_prev != current_playable_id
+
+            if isNewTrack:
+                track_info = get_info().get_track_by_id(current_state["playable_id"])
+            else:
+                track_info = info_cache
+                
+            if not (track_info and isinstance(track_info, dict) and track_info.get('success') is True):
+                log("Failed to get track information.", LogType.Error)
+                return {"success": False}
+            
+            playable_id_prev = current_playable_id
+            info_cache = track_info
             name_current = ", ".join(track_info["artists"]) + " - " + track_info["title"]
-            global name_prev
-            if str(name_current) != name_prev:
+            if isNewTrack:
                 log(f'Now listening to "{name_current}" on device "{current_state["device_name"]}"')
             # Если песня уже играет, просто вернем её с актуальным статусом паузы и позиции.
             elif Presence.currentTrack["success"]:
@@ -499,7 +514,6 @@ class Presence:
                 )
                 return currentTrack_copy
 
-            name_prev = str(name_current)
             trackId = track_info["track_id"].split(":")
             if track_info:
                 duration_ms = int(current_state["duration_ms"])
