@@ -47,7 +47,6 @@ class TokenWindow(QMainWindow):
 
     def on_url_changed(self, url):
         url_str = url.toString()
-        print(url_str)
         if "music" in url_str:
             self.browser.setUrl(QUrl("https://oauth.yandex.ru"))
         elif "oauth.yandex" in url_str:
