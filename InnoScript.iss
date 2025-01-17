@@ -1,4 +1,4 @@
-#define ScriptVersion "0.2.3"
+#define ScriptVersion "0.3"
 [Setup]
 AppName=YandexMusicRPC
 AppPublisher=FozerG
