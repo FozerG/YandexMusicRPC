@@ -40,7 +40,7 @@ CLIENT_ID_EN = "1269807014393942046"  # Yandex Music
 CLIENT_ID_RU_DECLINED = "1269826362399522849"  # Яндекс Музыку (склонение для активности "Слушает")
 
 # Версия (tag) скрипта для проверки на актуальность через Github Releases
-CURRENT_VERSION = "v0.3"
+CURRENT_VERSION = "v0.3.1"
 
 # Ссылка на репозиторий
 REPO_URL = "https://github.com/FozerG/YandexMusicRPC"
@@ -1030,7 +1030,7 @@ def Remove_yaToken_From_Memory():
 
 
 def update_token_task(icon_path, queue):
-    result = getToken.update_token(icon_path)
+    result = getToken.get_yandex_music_token(icon_path)
     queue.put(result)
 
 

@@ -1,58 +1,75 @@
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage
-from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QUrl, pyqtSignal
 from PyQt5.QtGui import QIcon
 import sys
 import re
 
-URL_WITH_ACCESS_TOKEN_REGEX = r'https:\/\/music\.yandex\.(?:ru|com|by|kz|ua)\/#access_token=([^&]*)'
-
+ACCESS_TOKEN_REGEX = r'access_token=([^&]*)'
 
 class CustomWebEnginePage(QWebEnginePage):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.profile().setHttpUserAgent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36"
-        )
-        
+    token_found = pyqtSignal(str)
+
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceId):
-        pass
+        match = re.search(ACCESS_TOKEN_REGEX, message)
+        if match:
+            token = match.group(1)
+            self.token_found.emit(token)
 
 
 class TokenWindow(QMainWindow):
-    def __init__(self, url, icon_path):
+    def __init__(self, initial_url, icon_path=None):
         super().__init__()
         self.setWindowTitle("Authorization")
         self.setGeometry(100, 100, 700, 800)
-        self.setWindowIcon(QIcon(icon_path))
-        
-        self.browser = QWebEngineView()
-        self.browser.setPage(CustomWebEnginePage(self.browser))
-        self.browser.page().profile().cookieStore().deleteAllCookies()
-        self.browser.urlChanged.connect(self.on_url_changed)
+        if icon_path:
+            self.setWindowIcon(QIcon(icon_path))
 
-        self.browser.setUrl(QUrl(url))
-        
+        self.browser = QWebEngineView()
+        self.page = CustomWebEnginePage(self.browser)
+        self.browser.setPage(self.page)
+        self.page.token_found.connect(self.on_token_found)
+        self.browser.urlChanged.connect(self.on_url_changed)
+        self.browser.page().profile().cookieStore().deleteAllCookies()
+        self.browser.setUrl(QUrl(initial_url))
+
         central_widget = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(self.browser)
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
-        
+
         self.token = None
+
+    def on_token_found(self, token):
+        self.token = token
+        QApplication.quit()
 
     def on_url_changed(self, url):
         url_str = url.toString()
-        match = re.search(URL_WITH_ACCESS_TOKEN_REGEX, url_str)
-        if match:
-            self.token = match.group(1) 
-            self.close()
+        print(url_str)
+        if "music" in url_str:
+            self.browser.setUrl(QUrl("https://oauth.yandex.ru"))
+        elif "oauth.yandex" in url_str:
+            self.execute_fetch_script()
 
+    def execute_fetch_script(self):
+        script = """
+        fetch("https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d")
+            .then((response) => response.text())
+            .then((text) => {
+                const tokenMatch = text.match(/access_token=(.*?)&/);
+                if (tokenMatch) {
+                    console.log("access_token=" + tokenMatch[1]);
+                }
+            });
+        """
+        self.browser.page().runJavaScript(script)
 
-def update_token(icon_path):
+def get_yandex_music_token(icon_path=None):
     app = QApplication(sys.argv)
-    oauth_url = "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d"  # Official link to OAuth Yandex.Music
-    token_window = TokenWindow(oauth_url, icon_path)
+    initial_url = "https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d" # Offical oauth url on Yandex.Music
+    token_window = TokenWindow(initial_url, icon_path)
     token_window.show()
     app.exec_()
     return token_window.token
