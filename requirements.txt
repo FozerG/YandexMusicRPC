@@ -11,5 +11,6 @@ pywin32
 Pillow
 asyncio
 psutil
-PyQt5
+PyQt6
+PyQt6-WebEngine
 aiohttp
