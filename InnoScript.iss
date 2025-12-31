@@ -1,4 +1,4 @@
-#define ScriptVersion "0.3.1"
+#define ScriptVersion "0.4"
 [Setup]
 AppName=YandexMusicRPC
 AppPublisher=FozerG
@@ -75,10 +75,8 @@ procedure DeleteStartupShortcut;
 var
   StartupShortcut: string;
 begin
-  // Получаем путь к ярлыку в автозагрузке
   StartupShortcut := ExpandConstant('{userappdata}\Microsoft\Windows\Start Menu\Programs\Startup\YandexMusicRPC.lnk');
   
-  // Проверяем, существует ли ярлык, и удаляем его, если он есть
   if FileExists(StartupShortcut) then
   begin
     DeleteFile(StartupShortcut);
@@ -89,10 +87,8 @@ procedure DeleteRegistryEntry;
 var
   RunKey: string;
 begin
-  // Определяем путь к ключу реестра
   RunKey := 'Software\Microsoft\Windows\CurrentVersion\Run';
 
-  // Проверяем, существует ли запись реестра, и удаляем её, если она есть
   if RegValueExists(HKEY_CURRENT_USER, RunKey, 'YandexMusicRPC') then
   begin
     RegDeleteValue(HKEY_CURRENT_USER, RunKey, 'YandexMusicRPC');
@@ -101,7 +97,6 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  // Выполняем действия только после завершения удаления программы
   if CurUninstallStep = usPostUninstall then
   begin
     DeleteStartupShortcut;
