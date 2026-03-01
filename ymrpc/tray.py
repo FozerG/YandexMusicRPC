@@ -1,3 +1,4 @@
+import threading
 import webbrowser
 
 import pystray
@@ -53,9 +54,15 @@ def update_account_name(icon, new_account_name: str):
         pystray.MenuItem("Start with Windows", toggle_auto_start_windows, checked=lambda item: state.auto_start_windows),
         pystray.MenuItem("Yandex settings", settings_menu),
         pystray.MenuItem("RPC settings", rpc_settings_menu),
+        pystray.MenuItem("Restart RPC", lambda: _restart_rpc()),
         pystray.MenuItem("GitHub", tray_click),
         pystray.MenuItem("Exit", tray_click),
     )
+
+
+def _restart_rpc():
+    log("Restarting RPC from tray...", LogType.Update_Status)
+    Presence.need_restart()
 
 
 def _login_from_tray():
@@ -84,6 +91,7 @@ def create_tray_icon():
             pystray.MenuItem("Start with Windows", toggle_auto_start_windows, checked=lambda item: state.auto_start_windows),
             pystray.MenuItem("Yandex settings", settings_menu),
             pystray.MenuItem("RPC settings", rpc_settings_menu),
+            pystray.MenuItem("Restart RPC", lambda: _restart_rpc()),
             pystray.MenuItem("GitHub", tray_click),
             pystray.MenuItem("Exit", tray_click),
         ),
