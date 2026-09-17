@@ -1,11 +1,13 @@
 # **<img src="./assets/YMRPC_ico.ico" alt="[DISCORD RPC]" width="30"/> &nbsp;Yandex Music Discord Rich Presence**
 [![TotalDownloads](https://img.shields.io/github/downloads/FozerG/YandexMusicRPC/total)](https://github.com/FozerG/YandexMusicRPC/releases "Download") [![LastRelease](https://img.shields.io/github/v/release/FozerG/YandexMusicRPC)](https://github.com/FozerG/YandexMusicRPC/releases "Download") [![CodeOpen](https://img.shields.io/github/languages/top/FozerG/YandexMusicRPC)](https://github.com/FozerG/YandexMusicRPC/blob/main/main.py "Show code") [![OS - Windows](https://img.shields.io/badge/OS-Windows-blue?logo=windows&logoColor=white)](https://github.com/FozerG/YandexMusicRPC/releases "Download")
 
->Несмотря на неразумное решение о блокировке Discord в РФ, я продолжу поддерживать скрипт в рабочем состоянии, насколько это будет возможно 🕊️
+> [!WARNING]
+> Репозиторий переведён в режим **read-only** и больше не поддерживается. Его функциональность объединена с [WinYandexMusicRPC](https://github.com/FozerG/WinYandexMusicRPC).
+>
+> Для скачивания актуальной версии используйте [релизы WinYandexMusicRPC](https://github.com/FozerG/WinYandexMusicRPC/releases).
 
->[Мы будем пользоваться тем, что нам нравится.](https://github.com/Flowseal/zapret-discord-youtube)
-
-### Текущий статус скрипта - ⚠️ (Работает частично, но у некоторых пользователей всегда пауза)
+<details>
+<summary>Архивная документация YandexMusicRPC</summary>
 
 **Discord RPC для показа текущего трека играющего в Яндекс Музыке с любого устройства.**  
 
@@ -31,7 +33,7 @@
 1. Python <3.14, >=3.10
 
 ## Как скачать и использовать Exe?
-1. Скачиваем [последний доступный релиз](https://github.com/FozerG/YandexMusicRPC/releases)
+1. Скачиваем [актуальную версию WinYandexMusicRPC](https://github.com/FozerG/WinYandexMusicRPC/releases).
   
 2. Открываем YandexMusicRPC
 
@@ -58,3 +60,5 @@
 
 >За основу был взят код [WinYandexMusicRPC](https://github.com/FozerG/WinYandexMusicRPC)  
 >Используется [Yandex Music API](https://github.com/MarshalX/yandex-music-api)   
+
+</details>
